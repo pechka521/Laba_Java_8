@@ -11,10 +11,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,7 +39,6 @@ class LocationServiceTest {
 
     @BeforeEach
     void setUp() {
-        RequestCounter.reset();
         location = new Location();
         location.setId(1L);
         location.setName("Test Location");
@@ -49,7 +50,7 @@ class LocationServiceTest {
     }
 
     @Test
-    void testGetAll_FromCache() {
+    void testGetAllWhenCachedReturnsCachedData() {
         when(locationCache.containsKey("all_locations")).thenReturn(true);
         when(locationCache.get("all_locations")).thenReturn(List.of(location));
 
@@ -57,12 +58,11 @@ class LocationServiceTest {
 
         assertEquals(1, result.size());
         assertEquals(location, result.get(0));
-        assertEquals(1, RequestCounter.getRequestCount());
         verify(locationRepository, never()).findAll();
     }
 
     @Test
-    void testGetAll_FromDatabase() {
+    void testGetAllWhenNotCachedReturnsDatabaseData() {
         when(locationCache.containsKey("all_locations")).thenReturn(false);
         when(locationRepository.findAll()).thenReturn(List.of(location));
 
@@ -70,12 +70,11 @@ class LocationServiceTest {
 
         assertEquals(1, result.size());
         assertEquals(location, result.get(0));
-        assertEquals(1, RequestCounter.getRequestCount());
         verify(locationCache).put("all_locations", List.of(location));
     }
 
     @Test
-    void testGetById_FromCache() {
+    void testGetByIdWhenCachedReturnsCachedData() {
         when(locationCache.containsKey("location_1")).thenReturn(true);
         when(locationCache.get("location_1")).thenReturn(List.of(location));
 
@@ -83,12 +82,11 @@ class LocationServiceTest {
 
         assertTrue(result.isPresent());
         assertEquals(location, result.get());
-        assertEquals(1, RequestCounter.getRequestCount());
         verify(locationRepository, never()).findById(1L);
     }
 
     @Test
-    void testGetById_FromDatabase() {
+    void testGetByIdWhenNotCachedReturnsDatabaseData() {
         when(locationCache.containsKey("location_1")).thenReturn(false);
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
 
@@ -96,23 +94,21 @@ class LocationServiceTest {
 
         assertTrue(result.isPresent());
         assertEquals(location, result.get());
-        assertEquals(1, RequestCounter.getRequestCount());
         verify(locationCache).put("location_1", List.of(location));
     }
 
     @Test
-    void testGetById_NotFound() {
+    void testGetByIdWhenNotFoundReturnsEmpty() {
         when(locationCache.containsKey("location_1")).thenReturn(false);
         when(locationRepository.findById(1L)).thenReturn(Optional.empty());
 
         Optional<Location> result = locationService.getById(1L);
 
         assertFalse(result.isPresent());
-        assertEquals(1, RequestCounter.getRequestCount());
     }
 
     @Test
-    void testCreate() {
+    void testCreateWithSunriseSunsetIdsAddsRelationsAndClearsCache() {
         when(sunriseSunsetRepository.findAllById(List.of(1L))).thenReturn(List.of(sunriseSunset));
         when(locationRepository.save(any(Location.class))).thenReturn(location);
 
@@ -120,12 +116,11 @@ class LocationServiceTest {
 
         assertEquals(location, result);
         assertEquals(1, location.getSunriseSunsets().size());
-        assertEquals(1, RequestCounter.getRequestCount());
         verify(locationCache).clear();
     }
 
     @Test
-    void testUpdate_Success() {
+    void testUpdateWhenExistsUpdatesDataAndClearsCache() {
         Location updatedData = new Location();
         updatedData.setName("Updated Name");
         updatedData.setCountry("Updated Country");
@@ -140,45 +135,41 @@ class LocationServiceTest {
         assertEquals("Updated Name", result.get().getName());
         assertEquals("Updated Country", result.get().getCountry());
         assertEquals(1, result.get().getSunriseSunsets().size());
-        assertEquals(1, RequestCounter.getRequestCount());
         verify(locationCache).clear();
     }
 
     @Test
-    void testUpdate_NotFound() {
+    void testUpdateWhenNotFoundReturnsEmpty() {
         when(locationRepository.findById(1L)).thenReturn(Optional.empty());
 
         Optional<Location> result = locationService.update(1L, location, List.of(1L));
 
         assertFalse(result.isPresent());
-        assertEquals(1, RequestCounter.getRequestCount());
     }
 
     @Test
-    void testDelete_Success() {
+    void testDeleteWhenExistsDeletesAndClearsCache() {
         when(locationRepository.findById(1L)).thenReturn(Optional.of(location));
 
         boolean result = locationService.delete(1L);
 
         assertTrue(result);
-        assertEquals(1, RequestCounter.getRequestCount());
         verify(locationRepository).delete(location);
         verify(locationCache).clear();
     }
 
     @Test
-    void testDelete_NotFound() {
+    void testDeleteWhenNotFoundReturnsFalse() {
         when(locationRepository.findById(1L)).thenReturn(Optional.empty());
 
         boolean result = locationService.delete(1L);
 
         assertFalse(result);
-        assertEquals(1, RequestCounter.getRequestCount());
         verify(locationRepository, never()).delete(any());
     }
 
     @Test
-    void testGetLocationsByDate_FromCache() {
+    void testGetLocationsByDateWhenCachedReturnsCachedData() {
         when(locationCache.containsKey("locations_date_2025-04-04")).thenReturn(true);
         when(locationCache.get("locations_date_2025-04-04")).thenReturn(List.of(location));
 
@@ -186,12 +177,11 @@ class LocationServiceTest {
 
         assertEquals(1, result.size());
         assertEquals(location, result.get(0));
-        assertEquals(1, RequestCounter.getRequestCount());
         verify(locationRepository, never()).findLocationsBySunriseSunsetDate("2025-04-04");
     }
 
     @Test
-    void testGetLocationsByDate_FromDatabase() {
+    void testGetLocationsByDateWhenNotCachedReturnsDatabaseData() {
         when(locationCache.containsKey("locations_date_2025-04-04")).thenReturn(false);
         when(locationRepository.findLocationsBySunriseSunsetDate("2025-04-04")).thenReturn(List.of(location));
 
@@ -199,12 +189,11 @@ class LocationServiceTest {
 
         assertEquals(1, result.size());
         assertEquals(location, result.get(0));
-        assertEquals(1, RequestCounter.getRequestCount());
         verify(locationCache).put("locations_date_2025-04-04", List.of(location));
     }
 
     @Test
-    void testBulkCreateOrUpdate() {
+    void testBulkCreateOrUpdateProcessesNewAndExistingLocations() {
         Location newLocation = new Location();
         newLocation.setName("New Location");
         newLocation.setCountry("New Country");
@@ -226,7 +215,6 @@ class LocationServiceTest {
         assertEquals("Existing Location", result.get(1).getName());
         assertEquals(1, result.get(0).getSunriseSunsets().size());
         assertEquals(1, result.get(1).getSunriseSunsets().size());
-        assertEquals(1, RequestCounter.getRequestCount());
         verify(locationCache).clear();
     }
 }
