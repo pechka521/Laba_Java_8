@@ -22,4 +22,5 @@ WORKDIR /app
 # Копируем собранный JAR из этапа сборки
 COPY --from=builder /app/target/*.jar app.jar
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Xms256m", "-Xmx512m", "-jar", "app.jar"]
+
